@@ -97,6 +97,11 @@ def get_base_ydl_opts() -> dict:
     opts = {
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'web_creator']
+            }
+        },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -271,18 +276,23 @@ def download_with_pytubefix(url: str,
 def extract_video_info(url: str) -> dict:
     """
     Extract video details and available download qualities without downloading.
-    Multi-layer fallback:
-    1. Base options (with sanitized cookies if valid)
-    2. Clean session without cookies
-    3. VisionOS / Web embedded client
+    Multi-layer mobile client fallback (bypasses YouTube datacenter bot detection):
+    1. Base options (with sanitized cookies if valid + iOS/Android clients)
+    2. Mobile iOS & Android client clean session
+    3. TV & Creator client fallback
     """
     attempts = [
         get_base_ydl_opts(),
         {
             'quiet': True,
             'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'android']
+                }
+            },
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
                 'Accept-Language': 'en-US,en;q=0.9',
             }
         },
@@ -291,7 +301,7 @@ def extract_video_info(url: str) -> dict:
             'no_warnings': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['visionos', 'web_embedded']
+                    'player_client': ['tv_embedded', 'web_creator']
                 }
             }
         }
@@ -500,8 +510,13 @@ def download_media(url: str,
         {
             'quiet': True,
             'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'android']
+                }
+            },
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
                 'Accept-Language': 'en-US,en;q=0.9',
             }
         }
