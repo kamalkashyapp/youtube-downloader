@@ -8,6 +8,7 @@ import re
 import sys
 import time
 import shutil
+import subprocess
 from pathlib import Path
 import yt_dlp
 
@@ -105,6 +106,168 @@ def get_base_ydl_opts() -> dict:
         opts['cookiefile'] = str(COOKIE_FILE)
     return opts
 
+def extract_with_pytubefix(url: str) -> dict:
+    from pytubefix import YouTube
+    yt = None
+    for client in ['ANDROID', 'IOS', 'WEB']:
+        try:
+            cand = YouTube(url, client=client)
+            if cand.title:
+                yt = cand
+                break
+        except Exception:
+            continue
+    if not yt:
+        raise ValueError("Pytubefix could not extract video info.")
+
+    title = yt.title or "YouTube Video"
+    video_id = yt.video_id or ""
+    duration = yt.length or 0
+    channel = yt.author or "Unknown Channel"
+    thumbnail = yt.thumbnail_url or f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+    view_count = yt.views or 0
+    upload_date = str(yt.publish_date or "")[:10].replace("-", "")
+    description = (yt.description or "")[:300]
+    webpage_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else url
+    is_short = "/shorts/" in url.lower() or (duration and duration <= 60 and "short" in title.lower())
+
+    streams = yt.streams
+    available_res = set()
+    for s in streams.filter(type="video"):
+        if s.resolution:
+            try:
+                res_num = int(s.resolution.replace("p", ""))
+                available_res.add(res_num)
+            except ValueError:
+                pass
+
+    standard_qualities = [
+        {"quality": "1080p", "height": 1080, "label": "Full HD (1080p)"},
+        {"quality": "720p", "height": 720, "label": "HD (720p)"},
+        {"quality": "480p", "height": 480, "label": "SD (480p)"},
+        {"quality": "360p", "height": 360, "label": "Standard (360p)"},
+    ]
+
+    max_height = max(available_res) if available_res else 720
+    highest = streams.get_highest_resolution() or streams.filter(progressive=True).first() or streams.first()
+    best_cdn = highest.url if highest else ""
+
+    video_options = [{
+        "quality": "best",
+        "label": f"Best Available ({max_height}p)",
+        "height": max_height,
+        "format": "mp4",
+        "type": "video",
+        "direct_cdn_url": best_cdn
+    }]
+
+    for q in standard_qualities:
+        if any(h >= q["height"] for h in available_res) or not available_res:
+            matching = streams.filter(res=q["quality"]).first()
+            cdn_url = matching.url if matching else best_cdn
+            video_options.append({
+                "quality": q["quality"],
+                "label": q["label"],
+                "height": q["height"],
+                "format": "mp4",
+                "type": "video",
+                "direct_cdn_url": cdn_url
+            })
+
+    audio_stream = streams.get_audio_only()
+    best_audio_cdn = audio_stream.url if audio_stream else None
+    audio_options = [
+        {"quality": "320", "label": "MP3 High Quality (320 kbps)", "format": "mp3", "type": "audio", "direct_cdn_url": best_audio_cdn},
+        {"quality": "192", "label": "MP3 Medium Quality (192 kbps)", "format": "mp3", "type": "audio", "direct_cdn_url": best_audio_cdn},
+        {"quality": "128", "label": "MP3 Standard Quality (128 kbps)", "format": "mp3", "type": "audio", "direct_cdn_url": best_audio_cdn},
+        {"quality": "m4a", "label": "M4A Original Audio", "format": "m4a", "type": "audio", "direct_cdn_url": best_audio_cdn},
+    ]
+
+    return {
+        "id": video_id,
+        "url": webpage_url,
+        "title": title,
+        "duration": duration,
+        "duration_str": format_duration(duration),
+        "channel": channel,
+        "thumbnail": thumbnail,
+        "view_count": view_count,
+        "upload_date": upload_date,
+        "is_short": is_short,
+        "description": description + "..." if len(description) >= 300 else description,
+        "video_options": video_options,
+        "audio_options": audio_options
+    }
+
+def download_with_pytubefix(url: str,
+                            target_type: str = "video",
+                            quality: str = "720p",
+                            out_dir: Path = None,
+                            progress_callback = None) -> dict:
+    from pytubefix import YouTube
+    yt = None
+    for client in ['ANDROID', 'IOS', 'WEB']:
+        try:
+            cand = YouTube(url, client=client)
+            if cand.title:
+                yt = cand
+                break
+        except Exception:
+            continue
+    if not yt:
+        raise ValueError("Video download ke liye source connect nahi ho paya.")
+
+    title = sanitize_filename(yt.title or "Video")
+    vid_id = yt.video_id or "yt"
+
+    if progress_callback:
+        progress_callback({"stage": "downloading", "percent": 25.0, "speed": "--", "eta": "--", "message": "Downloading stream via secondary engine..."})
+
+    if target_type == "audio":
+        final_filename = f"{title}_{vid_id}.mp3" if quality != "m4a" else f"{title}_{vid_id}.m4a"
+        final_path = out_dir / final_filename
+
+        # Download progressive stream and extract clean audio with ffmpeg (bypasses YouTube SABR restriction)
+        prog_stream = yt.streams.filter(progressive=True).first() or yt.streams.filter(type="video").first()
+        temp_prog = out_dir / f"temp_{vid_id}.mp4"
+        prog_stream.download(output_path=str(out_dir), filename=temp_prog.name)
+
+        codec_flag = ["-b:a", "192k"] if quality != "m4a" else ["-c:a", "copy"]
+        try:
+            subprocess.run(["ffmpeg", "-y", "-i", str(temp_prog), "-vn"] + codec_flag + [str(final_path)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        finally:
+            if temp_prog.exists():
+                temp_prog.unlink()
+
+    else:
+        # Video
+        target_res = quality if quality in ["1080p", "720p", "480p", "360p"] else None
+        stream = None
+        if target_res:
+            stream = yt.streams.filter(progressive=True, res=target_res).first()
+            if not stream:
+                stream = yt.streams.filter(type="video", res=target_res).first()
+        if not stream:
+            stream = yt.streams.filter(progressive=True).first() or yt.streams.get_highest_resolution() or yt.streams.first()
+
+        final_filename = f"{title}_{vid_id}.mp4"
+        final_path = out_dir / final_filename
+        stream.download(output_path=str(out_dir), filename=final_filename)
+
+    file_size = final_path.stat().st_size if final_path.exists() else 0
+    if progress_callback:
+        progress_callback({"stage": "completed", "percent": 100.0, "speed": "--", "eta": "Done", "message": f"Download complete! ({format_bytes(file_size)})"})
+
+    return {
+        "filepath": str(final_path),
+        "filename": final_path.name,
+        "filesize": file_size,
+        "filesize_str": format_bytes(file_size),
+        "title": yt.title or title,
+        "ext": final_path.suffix.lstrip("."),
+        "download_url": f"/api/file/{final_path.name}"
+    }
+
 def extract_video_info(url: str) -> dict:
     """
     Extract video details and available download qualities without downloading.
@@ -153,10 +316,10 @@ def extract_video_info(url: str) -> dict:
             continue
 
     if not info:
-        raise ValueError(f"Video metadata fetch nahi ho paya: {str(last_err)}")
-
-    if not info:
-        raise ValueError("Video info khali mila.")
+        try:
+            return extract_with_pytubefix(url)
+        except Exception as pte:
+            raise ValueError(f"Video metadata fetch nahi ho paya: {str(last_err or pte)}")
 
     video_id = info.get("id", "")
     title = info.get("title", "YouTube Video")
@@ -402,7 +565,10 @@ def download_media(url: str,
             continue
 
     if last_err and not info:
-        raise last_err
+        try:
+            return download_with_pytubefix(url=url, target_type=target_type, quality=quality, out_dir=out_dir, progress_callback=progress_callback)
+        except Exception as pte:
+            raise ValueError(f"Download complete nahi ho paya: {str(last_err or pte)}")
 
     # Determine final saved file
     final_file = download_state.get("final_filepath")
