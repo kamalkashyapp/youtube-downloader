@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube & Shorts Downloader + In-Browser Player + REST API</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090a10;
+      --card-bg: rgba(18, 20, 32, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #ff0055;
+      --accent-grad: linear-gradient(135deg, #ff0055 0%, #ff5500 50%, #9900ff 100%);
+      --accent-glow: rgba(255, 0, 85, 0.35);
+      --text: #f0f3fa;
+      --text-muted: #8d95ab;
+      --success: #00e676;
+      --success-glow: rgba(0, 230, 118, 0.3);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(255, 0, 85, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(153, 0, 255, 0.12) 0%, transparent 40%);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 80px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 860px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(255, 0, 85, 0.12);
+      border: 1px solid rgba(255, 0, 85, 0.25);
+      color: #ff3377;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .header h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 800;
+      line-height: 1.2;
+      background: linear-gradient(180deg, #ffffff 30%, #a6b2c9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 16px;
+      max-width: 640px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+
+    /* Main Box */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .input-group {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: rgba(8, 10, 18, 0.85);
+      border: 1.5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 6px 6px 6px 18px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-group:focus-within {
+      border-color: #ff0055;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .url-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 16px;
+      padding: 10px 0;
+      font-family: inherit;
+    }
+
+    .url-input::placeholder {
+      color: #555e75;
+    }
+
+    .btn-paste {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      margin-right: 8px;
+    }
+
+    .btn-paste:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .btn-fetch {
+      background: var(--accent-grad);
+      border: none;
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .btn-fetch:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .btn-fetch:active {
+      transform: translateY(1px);
+    }
+
+    /* Video Preview & Options Card */
+    .preview-card {
+      display: none;
+      margin-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 24px;
+    }
+
+    .preview-card.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .video-header {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .video-header.expanded {
+      flex-direction: column;
+    }
+
+    .video-thumb-wrap {
+      position: relative;
+      width: 220px;
+      min-width: 220px;
+      aspect-ratio: 16/9;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      transition: all 0.3s ease;
+    }
+
+    .video-thumb-wrap.expanded {
+      width: 100% !important;
+      min-width: 100% !important;
+      aspect-ratio: 16/9;
+      margin-bottom: 14px;
+    }
+
+    .video-thumb-wrap.short-aspect {
+      width: 120px;
+      min-width: 120px;
+      aspect-ratio: 9/16;
+    }
+
+    .video-thumb-wrap.short-aspect.expanded {
+      width: 320px !important;
+      min-width: 320px !important;
+      margin: 0 auto 16px;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #ff0055;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .video-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .play-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.9;
+      transition: all 0.2s;
+    }
+
+    .video-thumb-wrap:hover .play-overlay {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .play-icon {
+      width: 44px;
+      height: 44px;
+      background: #ff0055;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 18px;
+      padding-left: 3px;
+      box-shadow: 0 4px 18px rgba(255, 0, 85, 0.7);
+      transition: transform 0.2s;
+    }
+
+    .video-thumb-wrap:hover .play-icon {
+      transform: scale(1.12);
+    }
+
+    .duration-tag {
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      z-index: 2;
+    }
+
+    .video-details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .tag-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .type-pill {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .type-pill.short {
+      background: #ff0055;
+      color: #fff;
+    }
+
+    .type-pill.video {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .video-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.35;
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .channel-name {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .btn-preview-play {
+      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+      transition: all 0.2s;
+    }
+
+    .btn-preview-play:hover {
+      background: #ff0055;
+      border-color: #ff0055;
+    }
+
+    /* Format Tabs */
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    /* Quality Grid */
+    .quality-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .quality-chip {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .quality-chip:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .quality-chip.selected {
+      background: rgba(255, 0, 85, 0.12);
+      border-color: #ff0055;
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    .chip-main {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chip-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Download Action Button */
+    .btn-download-action {
+      width: 100%;
+      background: var(--accent-grad);
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      padding: 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 8px 24px var(--accent-glow);
+      transition: all 0.2s;
+    }
+
+    .btn-download-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px var(--accent-glow);
+    }
+
+    .btn-download-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Progress & Result Box */
+    .status-card {
+      display: none;
+      background: rgba(10, 12, 22, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .status-card.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 14px 0 10px;
+    }
+
+    .progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent-grad);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Success Card with In-Browser Player */
+    .success-box {
+      display: none;
+      background: rgba(10, 16, 26, 0.95);
+      border: 1.5px solid var(--success);
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 24px;
+      box-shadow: 0 10px 30px rgba(0, 230, 118, 0.15);
+    }
+
+    .success-box.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .success-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .player-container {
+      margin: 14px 0;
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .media-player {
+      width: 100%;
+      max-height: 440px;
+      display: none;
+      outline: none;
+    }
+
+    .audio-player {
+      width: 100%;
+      padding: 12px;
+      display: none;
+      outline: none;
+    }
+
+    .btn-save-file {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #00e676;
+      color: #062012;
+      font-weight: 800;
+      font-size: 15px;
+      padding: 13px 26px;
+      border-radius: 10px;
+      text-decoration: none;
+      box-shadow: 0 6px 20px var(--success-glow);
+      transition: all 0.2s;
+    }
+
+    .btn-save-file:hover {
+      transform: translateY(-2px);
+      background: #1aff8c;
+    }
+
+    .btn-reset {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 13px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-reset:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* API Docs Section */
+    .api-section {
+      margin-top: 20px;
+    }
+
+    .api-toggle-btn {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 14px 20px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.2s;
+    }
+
+    .api-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .api-content {
+      display: none;
+      background: rgba(12, 14, 24, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .api-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .code-block {
+      background: #06070a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 10px 0 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #9cdcfe;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    .method-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 800;
+      font-size: 11px;
+      margin-right: 8px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .method-get { background: #0070f3; color: #fff; }
+    .method-post { background: #00e676; color: #000; }
+
+    .endpoint-row {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    @media (max-width: 600px) {
+      .video-header {
+        flex-direction: column;
+      }
+      .video-thumb-wrap, .video-thumb-wrap.short-aspect {
+        width: 100%;
+        min-width: 100%;
+      }
+      .quality-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="badge">⚡ In-Browser Player • 1080p • Shorts • MP3 Audio</div>
+      <h1>YouTube & Shorts Downloader</h1>
+      <p>YouTube Video ya Shorts ka link paste karein — webpage par he direct play karein ya MP4/MP3 format me 1-click download karein!</p>
+    </div>
+
+    <!-- Main Card -->
+    <div class="card">
+      <div class="input-group">
+        <input type="text" id="urlInput" class="url-input" placeholder="YouTube Video ya Shorts ka link paste karein (https://...)" value="">
+        <button id="pasteBtn" class="btn-paste">
+          <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+          Paste
+        </button>
+        <button id="fetchBtn" class="btn-fetch">
+          <span>Inspect Video</span>
+        </button>
+      </div>
+
+      <!-- Preview & Quality Card -->
+      <div id="previewCard" class="preview-card">
+        <div class="video-header" id="videoHeader">
+          <!-- Thumbnail / Direct HTML5 Video Player Wrap -->
+          <div id="thumbWrap" class="video-thumb-wrap" title="Direct HTML5 Video play karein">
+            <img id="videoThumb" class="video-thumb" src="" alt="Thumbnail">
+            <div class="play-overlay">
+              <div class="play-icon">▶</div>
+            </div>
+            <div id="durationTag" class="duration-tag">00:00</div>
+          </div>
+
+          <div class="video-details">
+            <div class="tag-row">
+              <span id="typePill" class="type-pill video">Video</span>
+              <span id="channelName" class="channel-name">Channel</span>
+            </div>
+            <h3 id="videoTitle" class="video-title">Title Here</h3>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+              <button id="btnPreviewPlay" class="btn-preview-play">
+                <span>▶ Play Direct Video</span>
+              </button>
+              <button id="btnExpandPlayer" class="btn-preview-play" style="display: none; background: rgba(255,255,255,0.05);">
+                <span>⛶ Expand Player</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Format Tabs -->
+        <div class="tabs">
+          <button id="tabVideo" class="tab-btn active">🎥 Video (MP4)</button>
+          <button id="tabAudio" class="tab-btn">🎵 Audio (MP3 / M4A)</button>
+        </div>
+
+        <!-- Quality Grid -->
+        <div id="qualityGrid" class="quality-grid"></div>
+
+        <!-- Download Action -->
+        <button id="downloadBtn" class="btn-download-action">
+          <span>🚀 Start Download</span>
+        </button>
+      </div>
+
+      <!-- Live Progress Bar -->
+      <div id="statusCard" class="status-card">
+        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px;">
+          <span id="statusMessage">Downloading...</span>
+          <span id="statusPercent" style="color: #ff0055;">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="progressBarFill" class="progress-bar-fill"></div>
+        </div>
+        <div class="progress-meta">
+          <span>Speed: <strong id="statusSpeed">--</strong></span>
+          <span>Downloaded: <strong id="statusBytes">--</strong></span>
+          <span>ETA: <strong id="statusEta">--</strong></span>
+        </div>
+      </div>
+
+      <!-- Success Download Ready + In-Browser Player -->
+      <div id="successBox" class="success-box">
+        <div class="success-header">
+          <span style="font-size: 26px;">🎉</span>
+          <div>
+            <h3 style="color: #00e676; font-size: 18px;">Download Ready! Abhi Webpage Par Play Karein:</h3>
+            <p id="successFilename" style="color: #c0c8db; font-size: 13px; word-break: break-all; margin-top: 2px;"></p>
+          </div>
+        </div>
+
+        <!-- In-Browser HTML5 Player -->
+        <div class="player-container">
+          <video id="videoPlayer" class="media-player" controls playsinline preload="metadata">
+            Your browser does not support HTML5 video.
+          </video>
+          <audio id="audioPlayer" class="audio-player" controls preload="metadata">
+            Your browser does not support HTML5 audio.
+          </audio>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px;">
+          <a id="saveFileLink" class="btn-save-file" href="#" download>
+            ⬇️ Save File to Device
+          </a>
+          <button id="btnReset" class="btn-reset">
+            🔄 Download Another Video
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- REST API Documentation Section -->
+    <div class="api-section">
+      <button id="apiToggleBtn" class="api-toggle-btn">
+        <span>⚡ REST API Endpoints & Developer Documentation</span>
+        <span id="apiToggleIcon">▼</span>
+      </button>
+
+      <div id="apiContent" class="api-content">
+        <p style="color: var(--text-muted); margin-bottom: 20px;">
+          Yeh downloader fully-featured REST API offer karta hai jise aap apne Python script, Node.js app, ya mobile app me use kar sakte hain:
+        </p>
+
+        <!-- Primary Endpoint -->
+        <div class="endpoint-row">
+          <div><span class="method-badge method-get">GET</span> <code>/api?url=https://www.youtube.com/watch?v=...</code></div>
+          <p style="color: var(--text-muted); margin: 6px 0;">Video metadata, title, duration aur sabhi qualities ke direct download links ka complete JSON response.</p>
+          <div class="code-block">curl "http://localhost:5055/api?url=https://www.youtube.com/watch?v=7SlptRQ_kPU"</div>
+        </div>
+
+        <!-- Endpoint 1 -->
+        <div class="endpoint-row">
+          <div><span class="method-badge method-post">POST</span> <code>/api/info</code></div>
+          <p style="color: var(--text-muted); margin: 6px 0;">Video metadata, title, duration aur available resolutions retrieve karne ke liye.</p>
+          <div class="code-block">curl -X POST http://localhost:5055/api/info \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=..."}'</div>
+        </div>
+
+        <!-- Endpoint 2 -->
+        <div class="endpoint-row">
+          <div><span class="method-badge method-post">POST</span> <code>/api/download</code></div>
+          <p style="color: var(--text-muted); margin: 6px 0;">Background download shuru karne ke liye (Returns job_id).</p>
+          <div class="code-block">curl -X POST http://localhost:5055/api/download \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/...", "type": "video", "quality": "1080p"}'</div>
+        </div>
+
+        <!-- Endpoint 3 -->
+        <div class="endpoint-row">
+          <div><span class="method-badge method-get">GET</span> <code>/api/progress/&lt;job_id&gt;</code></div>
+          <p style="color: var(--text-muted); margin: 6px 0;">Download percentage, speed aur ETA check karne ke liye.</p>
+          <div class="code-block">curl http://localhost:5055/api/progress/job_12345</div>
+        </div>
+
+        <!-- Endpoint 4 -->
+        <div class="endpoint-row">
+          <div><span class="method-badge method-get">GET</span> <code>/api/file/&lt;filename&gt;</code></div>
+          <p style="color: var(--text-muted); margin: 6px 0;">In-browser video streaming (`&lt;video src="..."&gt;`) ya direct file download (`?download=1`).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlInput = document.getElementById('urlInput');
+    const pasteBtn = document.getElementById('pasteBtn');
+    const fetchBtn = document.getElementById('fetchBtn');
+    const previewCard = document.getElementById('previewCard');
+    const thumbWrap = document.getElementById('thumbWrap');
+    const videoThumb = document.getElementById('videoThumb');
+    const durationTag = document.getElementById('durationTag');
+    const typePill = document.getElementById('typePill');
+    const channelName = document.getElementById('channelName');
+    const videoTitle = document.getElementById('videoTitle');
+    const btnPreviewPlay = document.getElementById('btnPreviewPlay');
+    const btnExpandPlayer = document.getElementById('btnExpandPlayer');
+    const videoHeader = document.getElementById('videoHeader');
+    const tabVideo = document.getElementById('tabVideo');
+    const tabAudio = document.getElementById('tabAudio');
+    const qualityGrid = document.getElementById('qualityGrid');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const statusCard = document.getElementById('statusCard');
+    const statusMessage = document.getElementById('statusMessage');
+    const statusPercent = document.getElementById('statusPercent');
+    const progressBarFill = document.getElementById('progressBarFill');
+    const statusSpeed = document.getElementById('statusSpeed');
+    const statusBytes = document.getElementById('statusBytes');
+    const statusEta = document.getElementById('statusEta');
+    const successBox = document.getElementById('successBox');
+    const successFilename = document.getElementById('successFilename');
+    const videoPlayer = document.getElementById('videoPlayer');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const saveFileLink = document.getElementById('saveFileLink');
+    const btnReset = document.getElementById('btnReset');
+
+    let currentVideoData = null;
+    let selectedType = 'video'; // 'video' | 'audio'
+    let selectedQuality = '720p';
+    let pollInterval = null;
+    let isDirectPlayerActive = false;
+    let isPlayerExpanded = false;
+
+    // Paste Action
+    pasteBtn.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          urlInput.value = text.trim();
+          fetchVideoInfo();
+        }
+      } catch (e) {
+        urlInput.focus();
+      }
+    });
+
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        fetchVideoInfo();
+      }
+    });
+
+    fetchBtn.addEventListener('click', fetchVideoInfo);
+
+    function stopAllPlayback() {
+      const existingDirect = document.getElementById('directPreviewVideo');
+      if (existingDirect) {
+        existingDirect.pause();
+        existingDirect.removeAttribute('src');
+        existingDirect.load();
+        existingDirect.remove();
+      }
+      if (videoPlayer) {
+        videoPlayer.pause();
+        videoPlayer.removeAttribute('src');
+      }
+      if (audioPlayer) {
+        audioPlayer.pause();
+        audioPlayer.removeAttribute('src');
+      }
+    }
+
+    async function fetchVideoInfo() {
+      const url = urlInput.value.trim();
+      if (!url) {
+        alert('Kripya YouTube link paste karein!');
+        return;
+      }
+
+      fetchBtn.disabled = true;
+      fetchBtn.innerHTML = '<span>Checking...</span>';
+      previewCard.classList.remove('active');
+      statusCard.classList.remove('active');
+      successBox.classList.remove('active');
+
+      // Stop previous players immediately to prevent ghost/double audio
+      stopAllPlayback();
+
+      try {
+        const res = await fetch('/api/info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const json = await res.json();
+
+        if (json.status !== 'success') {
+          throw new Error(json.error || 'Video info nahi mila.');
+        }
+
+        currentVideoData = json.data;
+        renderVideoPreview(currentVideoData);
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.innerHTML = '<span>Inspect Video</span>';
+      }
+    }
+
+    function renderVideoPreview(data) {
+      stopAllPlayback();
+      isDirectPlayerActive = false;
+      isPlayerExpanded = false;
+      if (videoHeader) videoHeader.classList.remove('expanded');
+      thumbWrap.classList.remove('expanded');
+      thumbWrap.style.cursor = 'pointer';
+      if (btnExpandPlayer) {
+        btnExpandPlayer.style.display = 'none';
+        btnExpandPlayer.innerHTML = '<span>⛶ Expand Player</span>';
+      }
+
+      // Restore initial thumbnail view inside thumbWrap
+      thumbWrap.innerHTML = `
+        <img id="videoThumb" class="video-thumb" src="${data.thumbnail}" alt="Thumbnail">
+        <div class="play-overlay">
+          <div class="play-icon">▶</div>
+        </div>
+        <div id="durationTag" class="duration-tag">${data.duration_str}</div>
+      `;
+
+      channelName.textContent = data.channel;
+      videoTitle.textContent = data.title;
+
+      if (data.is_short) {
+        typePill.textContent = '⚡ Shorts';
+        typePill.className = 'type-pill short';
+        thumbWrap.classList.add('short-aspect');
+      } else {
+        typePill.textContent = '🎥 Video';
+        typePill.className = 'type-pill video';
+        thumbWrap.classList.remove('short-aspect');
+      }
+
+      // Initial click starts video
+      thumbWrap.onclick = () => playDirectVideo();
+      btnPreviewPlay.onclick = () => playDirectVideo();
+      btnPreviewPlay.innerHTML = '<span>▶ Play Direct Video</span>';
+
+      renderQualityOptions();
+      previewCard.classList.add('active');
+      previewCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function playDirectVideo(resumeTime = 0) {
+      if (!currentVideoData) return;
+      const quality = selectedQuality || '720p';
+      const streamUrl = `/api/play?url=${encodeURIComponent(currentVideoData.url)}&quality=${quality}&type=${selectedType}`;
+
+      // 1. Stop any running audio/video to guarantee zero double sound
+      stopAllPlayback();
+
+      isDirectPlayerActive = true;
+      if (btnExpandPlayer) btnExpandPlayer.style.display = 'inline-flex';
+      btnPreviewPlay.innerHTML = `<span>⏳ Loading (${quality.toUpperCase()})...</span>`;
+
+      // 2. Remove thumbWrap click listener and pointer so clicking to pause DOES NOT re-trigger playDirectVideo
+      thumbWrap.onclick = null;
+      thumbWrap.style.cursor = 'default';
+
+      thumbWrap.innerHTML = `
+        <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #050608; color: #fff; gap: 8px;">
+          <div class="spinner"></div>
+          <span style="font-size: 11px; color: #ff0055; font-weight: 700;">Loading Direct Video (${quality.toUpperCase()})...</span>
+        </div>
+      `;
+
+      const video = document.createElement('video');
+      video.id = 'directPreviewVideo';
+      video.src = streamUrl;
+      video.controls = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.poster = currentVideoData.thumbnail;
+      video.style.width = '100%';
+      video.style.height = '100%';
+      video.style.objectFit = 'contain';
+      video.style.borderRadius = '12px';
+      video.style.background = '#000';
+
+      // Stop click events on video controls from bubbling to parent elements
+      video.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+
+      // Synchronize play / pause with button
+      video.onplay = () => {
+        btnPreviewPlay.innerHTML = `<span>⏸ Pause Video</span>`;
+      };
+      video.onpause = () => {
+        btnPreviewPlay.innerHTML = `<span>▶ Resume Video</span>`;
+      };
+
+      // Button controls play / pause
+      btnPreviewPlay.onclick = () => {
+        if (video.paused) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      };
+
+      video.onloadedmetadata = () => {
+        if (resumeTime > 0) {
+          video.currentTime = resumeTime;
+        }
+      };
+
+      video.oncanplay = () => {
+        thumbWrap.innerHTML = '';
+        thumbWrap.appendChild(video);
+        video.play().catch(() => {});
+      };
+
+      video.onerror = () => {
+        thumbWrap.innerHTML = `
+          <div style="padding: 14px; font-size: 12px; color: #ff4444; text-align: center; background: #111; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 12px;">
+            <span>⚠️ Direct stream load nahi ho payi.</span>
+            <button id="btnRetryVideo" style="margin-top: 6px; padding: 4px 10px; background: #ff0055; color: #fff; border: none; border-radius: 6px; font-size: 11px; cursor: pointer;">Retry</button>
+          </div>
+        `;
+        document.getElementById('btnRetryVideo')?.addEventListener('click', () => playDirectVideo());
+      };
+    }
+
+    if (btnExpandPlayer) {
+      btnExpandPlayer.addEventListener('click', () => {
+        isPlayerExpanded = !isPlayerExpanded;
+        if (isPlayerExpanded) {
+          if (videoHeader) videoHeader.classList.add('expanded');
+          thumbWrap.classList.add('expanded');
+          btnExpandPlayer.innerHTML = '<span>🗗 Minimize Player</span>';
+        } else {
+          if (videoHeader) videoHeader.classList.remove('expanded');
+          thumbWrap.classList.remove('expanded');
+          btnExpandPlayer.innerHTML = '<span>⛶ Expand Player</span>';
+        }
+      });
+    }
+
+    // Tabs toggle
+    tabVideo.addEventListener('click', () => {
+      selectedType = 'video';
+      tabVideo.classList.add('active');
+      tabAudio.classList.remove('active');
+      renderQualityOptions();
+    });
+
+    tabAudio.addEventListener('click', () => {
+      selectedType = 'audio';
+      tabAudio.classList.add('active');
+      tabVideo.classList.remove('active');
+      renderQualityOptions();
+    });
+
+    function renderQualityOptions() {
+      if (!currentVideoData) return;
+      qualityGrid.innerHTML = '';
+
+      const options = selectedType === 'video' ? currentVideoData.video_options : currentVideoData.audio_options;
+      if (options.length > 0) {
+        selectedQuality = options[0].quality;
+      }
+
+      options.forEach((opt, idx) => {
+        const chip = document.createElement('div');
+        chip.className = `quality-chip ${idx === 0 ? 'selected' : ''}`;
+        chip.innerHTML = `
+          <div class="chip-main">
+            <span>${opt.quality.toUpperCase()}</span>
+            <span style="font-size: 11px; color: ${selectedType === 'video' ? '#00e676' : '#ffaa00'};">${opt.format.toUpperCase()}</span>
+          </div>
+          <div class="chip-sub">${opt.label}</div>
+        `;
+
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('.quality-chip').forEach(c => c.classList.remove('selected'));
+          chip.classList.add('selected');
+          selectedQuality = opt.quality;
+          updateDownloadButtonText();
+
+          // Seamless direct quality switch if currently playing
+          const activeVideo = document.getElementById('directPreviewVideo');
+          if (activeVideo && isDirectPlayerActive) {
+            const curTime = activeVideo.currentTime || 0;
+            playDirectVideo(curTime);
+          }
+        });
+
+        qualityGrid.appendChild(chip);
+      });
+
+      updateDownloadButtonText();
+    }
+
+    function updateDownloadButtonText() {
+      const typeLabel = selectedType === 'video' ? 'MP4 Video' : 'MP3 Audio';
+      downloadBtn.innerHTML = `<span>🚀 Download ${selectedQuality.toUpperCase()} ${typeLabel}</span>`;
+    }
+
+    // Start Download
+    downloadBtn.addEventListener('click', async () => {
+      if (!currentVideoData) return;
+
+      const url = currentVideoData.url;
+      downloadBtn.disabled = true;
+      statusCard.classList.add('active');
+      successBox.classList.remove('active');
+
+      statusMessage.textContent = 'Connecting to download engine...';
+      statusPercent.textContent = '0%';
+      progressBarFill.style.width = '0%';
+
+      try {
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: url,
+            type: selectedType,
+            quality: selectedQuality
+          })
+        });
+
+        const json = await res.json();
+        if (json.status !== 'queued') {
+          throw new Error(json.error || 'Download shuru nahi ho paya.');
+        }
+
+        const jobId = json.job_id;
+        pollProgress(jobId);
+      } catch (err) {
+        alert('Download Error: ' + err.message);
+        downloadBtn.disabled = false;
+        statusCard.classList.remove('active');
+      }
+    });
+
+    function pollProgress(jobId) {
+      clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/progress/${jobId}`);
+          const job = await res.json();
+
+          if (job.status === 'failed') {
+            clearInterval(pollInterval);
+            downloadBtn.disabled = false;
+            statusMessage.textContent = 'Error: ' + job.error;
+            alert('Download failed: ' + job.error);
+            return;
+          }
+
+          const pct = job.percent || 0;
+          progressBarFill.style.width = `${pct}%`;
+          statusPercent.textContent = `${pct}%`;
+          statusMessage.textContent = job.message || 'Downloading...';
+          statusSpeed.textContent = job.speed || '--';
+          statusBytes.textContent = job.downloaded ? `${job.downloaded} / ${job.total}` : '--';
+          statusEta.textContent = job.eta || '--';
+
+          if (job.status === 'completed' && job.result) {
+            clearInterval(pollInterval);
+            downloadBtn.disabled = false;
+            progressBarFill.style.width = '100%';
+            statusPercent.textContent = '100%';
+            statusMessage.textContent = 'Download Complete!';
+
+            // Setup In-Browser Player
+            successFilename.textContent = `📁 ${job.result.filename} (${job.result.filesize_str})`;
+            
+            const fileUrl = job.result.download_url; // Streamable URL
+            const ext = (job.result.ext || '').toLowerCase();
+
+            if (ext === 'mp4' || ext === 'mkv' || ext === 'webm') {
+              audioPlayer.style.display = 'none';
+              audioPlayer.pause();
+              videoPlayer.style.display = 'block';
+              videoPlayer.src = fileUrl;
+              videoPlayer.load();
+              videoPlayer.play().catch(() => {});
+            } else {
+              videoPlayer.style.display = 'none';
+              videoPlayer.pause();
+              audioPlayer.style.display = 'block';
+              audioPlayer.src = fileUrl;
+              audioPlayer.load();
+              audioPlayer.play().catch(() => {});
+            }
+
+            // Save File Download link with ?download=1
+            saveFileLink.href = `${fileUrl}?download=1`;
+            saveFileLink.setAttribute('download', job.result.filename);
+
+            successBox.classList.add('active');
+            successBox.scrollIntoView({ behavior: 'smooth' });
+          }
+        } catch (e) {
+          console.warn('Progress poll error:', e);
+        }
+      }, 1000);
+    }
+
+    // Reset button
+    btnReset.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      stopAllPlayback();
+      urlInput.value = '';
+      previewCard.classList.remove('active');
+      statusCard.classList.remove('active');
+      successBox.classList.remove('active');
+      urlInput.focus();
+    });
+
+    // Toggle API Docs Accordion
+    const apiToggleBtn = document.getElementById('apiToggleBtn');
+    const apiContent = document.getElementById('apiContent');
+    const apiToggleIcon = document.getElementById('apiToggleIcon');
+
+    apiToggleBtn.addEventListener('click', () => {
+      const isOpen = apiContent.classList.contains('active');
+      if (isOpen) {
+        apiContent.classList.remove('active');
+        apiToggleIcon.textContent = '▼';
+      } else {
+        apiContent.classList.add('active');
+        apiToggleIcon.textContent = '▲';
+      }
+    });
+  </script>
+</body>
+</html>
