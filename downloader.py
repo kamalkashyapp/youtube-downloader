@@ -319,7 +319,7 @@ def extract_video_info(url: str) -> dict:
         try:
             return extract_with_pytubefix(url)
         except Exception as pte:
-            raise ValueError(f"Video metadata fetch nahi ho paya: {str(last_err or pte)}")
+            raise ValueError(f"Video metadata fetch nahi ho paya: {str(pte)}")
 
     video_id = info.get("id", "")
     title = info.get("title", "YouTube Video")
